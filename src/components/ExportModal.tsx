@@ -7,6 +7,7 @@ interface ExportModalProps {
   pointcCode: string;
   cCode: string;
   cppCode: string;
+  currentFileName?: string;
 }
 
 export const ExportModal: React.FC<ExportModalProps> = ({
@@ -15,10 +16,16 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   pointcCode,
   cCode,
   cppCode,
+  currentFileName = 'programa.pointc',
 }) => {
   const [copiedFile, setCopiedFile] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  let pointcFileName = currentFileName.trim();
+  if (!pointcFileName.endsWith('.pointc') && !pointcFileName.endsWith('.poinc')) {
+    pointcFileName += '.pointc';
+  }
 
   const downloadFile = (filename: string, content: string) => {
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
@@ -62,7 +69,7 @@ add_executable(main_cpp main.cpp)
   const readmeContent = `# Proyecto pointC
 
 Generado automáticamente con **pointC IDE**.
-- \`main.pointc\`: Código original en lenguaje natural estructurado.
+- \`${pointcFileName}\`: Código original en lenguaje natural estructurado.
 - \`main.c\`: Código traducido y optimizado en C Estándar (C17).
 - \`main.cpp\`: Código traducido en C++ Moderno (C++20).
 - \`Makefile\` / \`CMakeLists.txt\`: Scripts de compilación nativa.
@@ -82,7 +89,7 @@ make
   };
 
   const files = [
-    { name: 'main.pointc', label: 'Código pointC (Lenguaje Natural)', content: pointcCode, icon: FileText, color: 'text-cyan-400' },
+    { name: pointcFileName, label: 'Código pointC (Lenguaje Natural)', content: pointcCode, icon: FileText, color: 'text-cyan-400' },
     { name: 'main.c', label: 'Código C Estándar (C17)', content: cCode, icon: FileCode, color: 'text-blue-400' },
     { name: 'main.cpp', label: 'Código C++ Moderno (C++20)', content: cppCode, icon: FileCode, color: 'text-purple-400' },
     { name: 'Makefile', label: 'Makefile de Compilación', content: makefileContent, icon: Terminal, color: 'text-emerald-400' },

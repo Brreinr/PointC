@@ -152,7 +152,12 @@ export async function ensureAuthenticatedUser(): Promise<FirebaseUser> {
   return result.user;
 }
 
-// User Profile Helpers
+// Helper to normalize email for unique anti-abuse indexing
+export function sanitizeEmailKey(email: string): string {
+  return email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+}
+
+// User Profile Helpers with Anti-Abuse Welcome Bonus Verification
 export async function syncUserProfile(user: FirebaseUser): Promise<UserProfile> {
   const userRef = doc(db, 'users', user.uid);
   const userSnap = await getDoc(userRef);
@@ -167,11 +172,49 @@ export async function syncUserProfile(user: FirebaseUser): Promise<UserProfile> 
       language: data.language || 'es',
     };
   } else {
+    // ANTI-ABUSE VERIFICATION:
+    // Only genuinely new, unregistered accounts receive the 150 welcome credits.
+    // If the email was previously registered or claimed, grant 0 bonus credits.
+    let initialCredits = 150;
+
+    if (user.email && user.email.includes('@')) {
+      const emailKey = sanitizeEmailKey(user.email);
+      const registryRef = doc(db, 'welcome_registry', emailKey);
+      try {
+        const regSnap = await getDoc(registryRef);
+        if (regSnap.exists()) {
+          // Email was ALREADY registered or previously claimed welcome bonus
+          initialCredits = 0;
+          console.warn('[Anti-Abuse] Welcome bonus denied: email already registered in system:', user.email);
+        } else {
+          // Brand new unregistered email -> Record in permanent immutable registry
+          await setDoc(registryRef, {
+            email: user.email.toLowerCase(),
+            firstUid: user.uid,
+            creditsGranted: 150,
+            claimedAt: serverTimestamp(),
+          });
+          console.log('[Anti-Abuse] New account verified! 150 welcome credits granted to:', user.email);
+        }
+      } catch (err) {
+        console.warn('[Anti-Abuse] Registry check fallback:', err);
+      }
+    } else {
+      // Local or anonymous session anti-farming check
+      try {
+        if (localStorage.getItem('pointc_welcome_claimed')) {
+          initialCredits = 0;
+        } else {
+          localStorage.setItem('pointc_welcome_claimed', 'true');
+        }
+      } catch {}
+    }
+
     const initialProfile: UserProfile = {
       uid: user.uid,
       email: user.email || 'invitado@pointc.dev',
       displayName: user.displayName || 'Desarrollador pointC',
-      credits: 150, // Welcome gift of 150 IA credits
+      credits: initialCredits, // 150 IA credits if new, 0 if duplicate/abusive
       totalTokensSpent: 0,
       language: 'es',
       plan: 'Gratuito',
@@ -302,11 +345,11 @@ export async function recordGumroadPurchase(
   };
 }
 
-// Deduct IA Credits & Record Tokens Spent in Firestore (1 credit = 2000 tokens)
+// Deduct IA Credits & Record Tokens Spent in Firestore (1 credit = up to 4000 tokens)
 export async function deductUserCredit(
   userId: string,
   amount: number = 1,
-  tokensSpent: number = 2000
+  tokensSpent: number = 4000
 ): Promise<{ remainingCredits: number; totalTokensSpent: number } | null> {
   const currentUser = auth.currentUser;
   const actualUid = currentUser?.uid || userId;
@@ -329,7 +372,22 @@ export async function deductUserCredit(
   const data = snap.data();
   const currentCredits = data.credits ?? 0;
   const prevTokens = data.totalTokensSpent ?? 0;
-  if (currentCredits < amount) return null;
+
+  if (currentCredits < amount) {
+    if (currentCredits > 0) {
+      await setDoc(
+        userRef,
+        {
+          credits: 0,
+          totalTokensSpent: increment(tokensSpent),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      return { remainingCredits: 0, totalTokensSpent: prevTokens + tokensSpent };
+    }
+    return null;
+  }
 
   await setDoc(
     userRef,

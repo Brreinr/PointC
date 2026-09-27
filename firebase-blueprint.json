@@ -52,6 +52,18 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "creditsAdded", "amountUsd"]
+    },
+    "WelcomeRegistryEntry": {
+      "title": "WelcomeRegistryEntry",
+      "description": "Immutable ledger verifying unique emails that have claimed the 150 welcome credits to prevent fraud/abuse",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "firstUid": { "type": "string" },
+        "creditsGranted": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "firstUid", "creditsGranted"]
     }
   },
   "firestore": {
@@ -66,6 +78,10 @@
     "/transactions/{transactionId}": {
       "schema": "CreditTransaction",
       "description": "Purchased credit transaction logs"
+    },
+    "/welcome_registry/{emailKey}": {
+      "schema": "WelcomeRegistryEntry",
+      "description": "Anti-abuse registry ensuring each unique registered email only claims 150 welcome credits once"
     }
   }
 }

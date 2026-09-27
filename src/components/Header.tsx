@@ -5,6 +5,7 @@ import {
   Play,
   Download,
   FolderOpen,
+  Plus,
   Wand2,
   FileCode2,
   Save,
@@ -29,6 +30,8 @@ interface HeaderProps {
   onRenameFile: (newName: string) => void;
   onBackToDashboard: () => void;
   onSavePointCFile: () => void;
+  onOpenDiskFile?: (file: File) => void;
+  onNewBlankFile?: () => void;
   onTranslate: () => void;
   onOptimize: () => void;
   onSimulate: () => void;
@@ -57,6 +60,8 @@ export const Header: React.FC<HeaderProps> = ({
   onRenameFile,
   onBackToDashboard,
   onSavePointCFile,
+  onOpenDiskFile,
+  onNewBlankFile,
   onTranslate,
   onOptimize,
   onSimulate,
@@ -79,6 +84,7 @@ export const Header: React.FC<HeaderProps> = ({
   currentLanguage,
   onLanguageChange,
 }) => {
+  const diskFileInputRef = React.useRef<HTMLInputElement>(null);
   const tAutosave = TRANSLATIONS[currentLanguage].autosave;
   const tNav = TRANSLATIONS[currentLanguage].nav;
 
@@ -102,23 +108,59 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="font-mono font-black text-white text-xs">.C</span>
           </div>
 
-          {/* Current File indicator and quick download */}
-          <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1">
-            <FileCode2 className="w-3.5 h-3.5 text-cyan-400" />
+          {/* Current File indicator, quick download, disk opener, and new blank file */}
+          <div className="flex items-center gap-1 bg-slate-900 border border-slate-700/80 rounded-lg px-2 py-1">
+            <FileCode2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
             <input
               type="text"
               value={currentFileName}
               onChange={(e) => onRenameFile(e.target.value)}
               className="bg-transparent text-xs font-mono font-bold text-slate-200 focus:outline-none focus:text-white w-28 sm:w-36 truncate"
-              title="Haz clic para renombrar archivo"
+              title="Haz clic para renombrar (ej. archivo.pointc o archivo.poinc)"
             />
+            {/* Quick Save / Download in natural language */}
             <button
               onClick={onSavePointCFile}
-              className="text-slate-400 hover:text-cyan-300 p-0.5 rounded transition"
-              title="Descargar archivo .pointc"
+              className="text-slate-400 hover:text-cyan-300 p-1 rounded hover:bg-slate-800 transition"
+              title="Guardar / Descargar archivo en lenguaje natural (.pointc / .poinc)"
             >
               <Save className="w-3.5 h-3.5" />
             </button>
+            {/* Open / Read .pointc or .poinc from disk */}
+            {onOpenDiskFile && (
+              <>
+                <input
+                  ref={diskFileInputRef}
+                  type="file"
+                  accept=".pointc,.poinc,.txt"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      onOpenDiskFile(f);
+                      e.target.value = '';
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => diskFileInputRef.current?.click()}
+                  className="text-slate-400 hover:text-cyan-300 p-1 rounded hover:bg-slate-800 transition"
+                  title="Abrir / Leer archivo desde tu equipo (.pointc o .poinc)"
+                >
+                  <FolderOpen className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+            {/* New blank file with ZERO preloaded code */}
+            {onNewBlankFile && (
+              <button
+                onClick={onNewBlankFile}
+                className="text-slate-400 hover:text-emerald-300 p-1 rounded hover:bg-slate-800 transition"
+                title="Crear nuevo archivo en blanco (completamente vacío)"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Real-time Auto-Save Status Badge */}

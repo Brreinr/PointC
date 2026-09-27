@@ -502,7 +502,7 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
             </div>
 
             <div className="text-[11px] text-slate-300 pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
-              <span className="text-amber-300 font-mono font-semibold">1 crédito paga 2,000 tokens</span>
+              <span className="text-amber-300 font-mono font-semibold">1 crédito cubre hasta 4,000 tokens</span>
               <span className="text-emerald-400 font-semibold flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 Firestore Sync Activo

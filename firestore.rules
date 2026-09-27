@@ -29,5 +29,12 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
+
+    // Anti-abuse Welcome Bonus Registry: immutable, each email key can only be created once
+    match /welcome_registry/{emailKey} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if false; // Prevents deleting or tampering to re-claim
+    }
   }
 }

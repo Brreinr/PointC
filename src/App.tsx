@@ -304,29 +304,44 @@ export default function App() {
     }
     if (user.credits < minCredits) {
       setIsProfileOpen(true);
-      setErrorMessage(`Saldo insuficiente (${user.credits} créditos). 1 crédito paga 2,000 tokens. Adquiere más créditos en la pasarela.`);
+      setErrorMessage(`Saldo insuficiente (${user.credits} créditos). 1 crédito cubre hasta 4,000 tokens. Adquiere más créditos en la pasarela.`);
       return false;
     }
     return true;
   };
 
-  // Consume credits and tokens dynamically based on API usage (1 credit = 2000 tokens)
+  // Consume credits and tokens dynamically based on API usage (1 credit = up to 4000 tokens)
   const consumeTokensAndCredits = async (credits: number, tokens: number, action: string = 'Operación') => {
     if (!user) return;
     const finalCredits = Math.max(1, credits);
-    setUser((prev) =>
-      prev
-        ? {
-            ...prev,
-            credits: Math.max(0, prev.credits - finalCredits),
-            totalTokensSpent: (prev.totalTokensSpent || 0) + tokens,
-          }
-        : null
-    );
 
-    if (firebaseUid) {
+    setUser((prev) => {
+      if (!prev) return null;
+      const nextCredits = Math.max(0, prev.credits - finalCredits);
+      const nextTokens = (prev.totalTokensSpent || 0) + tokens;
+
+      // Sync local profile storage immediately so it does not revert on refresh
       try {
-        await deductUserCredit(firebaseUid, finalCredits, tokens);
+        const rawLocal = localStorage.getItem('pointc_local_user');
+        if (rawLocal) {
+          const parsed = JSON.parse(rawLocal);
+          parsed.credits = nextCredits;
+          parsed.totalTokensSpent = nextTokens;
+          localStorage.setItem('pointc_local_user', JSON.stringify(parsed));
+        }
+      } catch {}
+
+      return {
+        ...prev,
+        credits: nextCredits,
+        totalTokensSpent: nextTokens,
+      };
+    });
+
+    const targetUid = firebaseUid || auth.currentUser?.uid;
+    if (targetUid) {
+      try {
+        await deductUserCredit(targetUid, finalCredits, tokens);
       } catch (e) {
         console.warn('Firestore token/credit sync fallback:', e);
       }
@@ -337,7 +352,7 @@ export default function App() {
       credits: finalCredits,
       action,
     });
-    setTimeout(() => setTokenToast(null), 4500);
+    setTimeout(() => setTokenToast(null), 4000);
   };
 
   // Deduct credit helper fallback
@@ -527,23 +542,35 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
-  // Handle open file from dashboard
+  // Handle open file from dashboard (reuses cached C/C++ without consuming credits unnecessarily)
   const handleOpenFile = (file: ProjectFile) => {
     if (pendingSaveRef.current) {
       performAutoSave(pointcCode, currentFile.id, currentFile.name, cCode, cppCode);
     }
     setCurrentFile(file);
     setPointcCode(file.content);
+    if (file.cCode) setCCode(file.cCode);
+    if (file.cppCode) setCppCode(file.cppCode);
     setCurrentScreen('ide');
-    handleTranslate(file.content);
+
+    // Only translate if the file has never been translated before
+    if (!file.cCode && !file.cppCode && file.content.trim()) {
+      handleTranslate(file.content);
+    }
   };
 
-  // Handle create new file (ALWAYS pre-populated with code!)
+  // Handle create new file: when templateCode is provided (even if blank ""), DO NOT preload code!
   const handleCreateNewFile = (fileName: string, templateCode?: string) => {
-    const newCode = templateCode && templateCode.trim() ? templateCode : CANONICAL_STARTER_CODE;
+    const newCode = templateCode !== undefined ? templateCode : CANONICAL_STARTER_CODE;
+    let name = fileName.trim();
+    if (!name) name = language === 'en' ? 'my_program.pointc' : 'mi_programa.pointc';
+    if (!name.endsWith('.pointc') && !name.endsWith('.poinc')) {
+      name += '.pointc';
+    }
+
     const newFile: ProjectFile = {
       id: 'file_' + Math.random().toString(36).substr(2, 9),
-      name: fileName,
+      name: name,
       content: newCode,
       updatedAt: Date.now(),
       createdAt: Date.now(),
@@ -552,10 +579,44 @@ export default function App() {
     setRecentFiles((prev) => [newFile, ...prev.filter((f) => f.id !== newFile.id)]);
     setCurrentFile(newFile);
     setPointcCode(newCode);
-    setCurrentScreen('ide');
 
+    // If completely blank, reset translation panes so there is NO preloaded code
+    if (!newCode.trim()) {
+      setCCode('');
+      setCppCode('');
+      setTranslationData(null);
+      setOptimizationData(null);
+      setSimulationData(null);
+      setDiagnosticData(null);
+    }
+
+    setCurrentScreen('ide');
     performAutoSave(newCode, newFile.id, newFile.name);
-    handleTranslate(newCode);
+
+    if (newCode.trim()) {
+      handleTranslate(newCode);
+    }
+  };
+
+  // Create completely blank new file without any preloaded code
+  const handleNewBlankFile = () => {
+    const count = recentFiles.length + 1;
+    const defaultName = language === 'en' ? `blank_${count}.pointc` : `archivo_${count}.pointc`;
+    handleCreateNewFile(defaultName, '');
+  };
+
+  // Open / read .pointc or .poinc file directly from disk into IDE
+  const handleOpenFileFromDisk = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = (e.target?.result as string) ?? '';
+      let fileName = file.name.trim();
+      if (!fileName.endsWith('.pointc') && !fileName.endsWith('.poinc')) {
+        fileName += '.pointc';
+      }
+      handleCreateNewFile(fileName, content);
+    };
+    reader.readAsText(file, 'UTF-8');
   };
 
   // Handle delete file (updates state and persists 'deleted' status in Firestore)
@@ -594,7 +655,7 @@ export default function App() {
     }, 800);
   };
 
-  // Rename current file
+  // Rename current file (supports both .pointc and .poinc)
   const handleRenameFile = (newName: string) => {
     let name = newName.trim();
     if (!name.endsWith('.pointc') && !name.endsWith('.poinc')) {
@@ -604,14 +665,18 @@ export default function App() {
     performAutoSave(pointcCode, currentFile.id, name, cCode, cppCode);
   };
 
-  // Save / Download .pointc file directly
+  // Save / Download .pointc or .poinc file directly in natural language
   const handleSavePointCFile = () => {
     performAutoSave(pointcCode, currentFile.id, currentFile.name, cCode, cppCode);
+    let downloadName = currentFile.name.trim();
+    if (!downloadName.endsWith('.pointc') && !downloadName.endsWith('.poinc')) {
+      downloadName += '.pointc';
+    }
     const blob = new Blob([pointcCode], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = currentFile.name.endsWith('.pointc') ? currentFile.name : `${currentFile.name}.pointc`;
+    link.download = downloadName;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -852,6 +917,26 @@ export default function App() {
     handleTranslate(code);
   };
 
+  // Global drag-and-drop listener for .pointc and .poinc files across the entire web app
+  useEffect(() => {
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault();
+    };
+    const handleGlobalDrop = (e: DragEvent) => {
+      e.preventDefault();
+      const file = e.dataTransfer?.files?.[0];
+      if (file && (file.name.endsWith('.pointc') || file.name.endsWith('.poinc') || file.name.endsWith('.txt'))) {
+        handleOpenFileFromDisk(file);
+      }
+    };
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('drop', handleGlobalDrop);
+    return () => {
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('drop', handleGlobalDrop);
+    };
+  }, [recentFiles]);
+
   // Global keyboard shortcuts (Cmd+S for Auto-save, Cmd+Enter for Translate, Cmd+R for Run/Audit, Cmd+1-4 for Tabs)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -957,7 +1042,7 @@ export default function App() {
                 </span>
               </div>
               <p className="text-[11px] text-slate-300 mt-0.5">
-                Consumo: <strong className="text-amber-400">-{tokenToast.credits} crédito{tokenToast.credits > 1 ? 's' : ''}</strong> (1 crédito paga 2,000 tokens)
+                Consumo: <strong className="text-amber-400">-{tokenToast.credits} crédito{tokenToast.credits > 1 ? 's' : ''}</strong> (1 crédito cubre hasta 4,000 tokens)
               </p>
             </div>
             <button
@@ -986,6 +1071,8 @@ export default function App() {
           setCurrentScreen('dashboard');
         }}
         onSavePointCFile={handleSavePointCFile}
+        onOpenDiskFile={handleOpenFileFromDisk}
+        onNewBlankFile={handleNewBlankFile}
         onTranslate={() => handleTranslate()}
         onOptimize={() => handleTriggerOptimize()}
         onSimulate={() => handleRunDiagnostic()}
@@ -1156,6 +1243,7 @@ export default function App() {
         pointcCode={pointcCode}
         cCode={cCode}
         cppCode={cppCode}
+        currentFileName={currentFile.name}
       />
 
       <AuthModal
@@ -1226,7 +1314,7 @@ export default function App() {
               </span>
             </div>
             <p className="text-[11px] text-slate-300 mt-0.5">
-              Consumo: <strong className="text-amber-400">-{tokenToast.credits} crédito{tokenToast.credits > 1 ? 's' : ''}</strong> (1 crédito paga 2,000 tokens)
+              Consumo: <strong className="text-amber-400">-{tokenToast.credits} crédito{tokenToast.credits > 1 ? 's' : ''}</strong> (1 crédito cubre hasta 4,000 tokens)
             </p>
           </div>
           <button

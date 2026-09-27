@@ -92,7 +92,8 @@ async function generateContentWithFallback(options: {
   throw lastError || new Error('No se pudo obtener respuesta del modelo Gemini.');
 }
 
-// Token and Credit calculation helper (1 credit = 2000 tokens)
+// Token and Credit calculation helper
+// 1 crédito cubre una operación estándar completa de hasta 4,000 tokens (incluyendo contexto del compilador y salida nativa).
 function extractUsageInfo(response: any, fallbackPromptLen: number = 500) {
   const usageMetadata = response?.usageMetadata || {};
   const promptTokens = Number(usageMetadata.promptTokenCount) || 0;
@@ -104,8 +105,9 @@ function extractUsageInfo(response: any, fallbackPromptLen: number = 500) {
     totalTokens = Math.max(50, Math.ceil((fallbackPromptLen + outputLen) / 3.8));
   }
 
-  // 1 credito paga 2000 tokens
-  const tokensPerCredit = 2000;
+  // 1 crédito cubre hasta 4,000 tokens completos (incluyendo contexto del sistema y código generado).
+  // Esto garantiza que cada traducción, optimización o diagnóstico estándar consuma exactamente 1 crédito.
+  const tokensPerCredit = 4000;
   const creditsDeducted = Math.max(1, Math.ceil(totalTokens / tokensPerCredit));
 
   return {

@@ -129,14 +129,14 @@ export const FileDashboard: React.FC<FileDashboardProps> = ({
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     let name = newFileName.trim();
-    if (!name) name = codeLanguage === 'en' ? 'my_program' : 'mi_programa';
+    if (!name) name = codeLanguage === 'en' ? 'my_program.pointc' : 'mi_programa.pointc';
     if (!name.endsWith('.pointc') && !name.endsWith('.poinc')) {
       name += '.pointc';
     }
 
     let codeToUse = codeLanguage === 'en' ? CANONICAL_STARTER_CODE_EN : CANONICAL_STARTER_CODE_ES;
     if (selectedTemplate === 'blank') {
-      codeToUse = codeLanguage === 'en' ? BLANK_STARTER_CODE_EN : BLANK_STARTER_CODE_ES;
+      codeToUse = ''; // Completely blank, ZERO preloaded code as requested
     } else if (selectedTemplate !== 'starter') {
       const found = POINTC_PRESETS.find((p) => p.id === selectedTemplate);
       if (found) codeToUse = found.pointcCode;
@@ -151,10 +151,10 @@ export const FileDashboard: React.FC<FileDashboardProps> = ({
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const content = event.target?.result as string;
-      onCreateNewFile(file.name, content || CANONICAL_STARTER_CODE);
+      const content = (event.target?.result as string) ?? '';
+      onCreateNewFile(file.name, content);
     };
-    reader.readAsText(file);
+    reader.readAsText(file, 'UTF-8');
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -165,10 +165,10 @@ export const FileDashboard: React.FC<FileDashboardProps> = ({
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const content = event.target?.result as string;
-      onCreateNewFile(file.name, content || CANONICAL_STARTER_CODE);
+      const content = (event.target?.result as string) ?? '';
+      onCreateNewFile(file.name, content);
     };
-    reader.readAsText(file);
+    reader.readAsText(file, 'UTF-8');
   };
 
   return (
@@ -365,20 +365,20 @@ export const FileDashboard: React.FC<FileDashboardProps> = ({
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-300 flex items-center justify-between">
                     <span>{tDashboard.fileNameLabel}</span>
-                    <span className="text-[11px] text-cyan-400 font-mono">.pointc</span>
+                    <span className="text-[11px] text-cyan-400 font-mono">.pointc o .poinc</span>
                   </label>
                   <div className="relative">
                     <input
                       type="text"
                       value={newFileName}
                       onChange={(e) => setNewFileName(e.target.value)}
-                      placeholder={tDashboard.fileNamePlaceholder}
+                      placeholder={codeLanguage === 'en' ? 'e.g. my_program.pointc or my_program.poinc' : 'ej. mi_programa.pointc o mi_programa.poinc'}
                       className="w-full bg-[#070a12] border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-400 font-mono"
                     />
-                    <span className="absolute right-3 top-2.5 text-slate-500 text-xs font-mono select-none">
-                      .pointc
-                    </span>
                   </div>
+                  <p className="text-[10px] text-slate-500 font-sans">
+                    {codeLanguage === 'en' ? 'Accepts .pointc and .poinc extensions' : 'Acepta extensiones .pointc y .poinc'}
+                  </p>
                 </div>
 
                 <div className="space-y-1.5">
@@ -394,7 +394,7 @@ export const FileDashboard: React.FC<FileDashboardProps> = ({
                       {tDashboard.starterTemplateDefault}
                     </option>
                     <option value="blank">
-                      {tDashboard.starterTemplateBlank}
+                      {codeLanguage === 'en' ? '📄 Empty / Blank (No preloaded code)' : '📄 Archivo en Blanco (Sin ningún código precargado)'}
                     </option>
                     {POINTC_PRESETS.map((p) => (
                       <option key={p.id} value={p.id}>

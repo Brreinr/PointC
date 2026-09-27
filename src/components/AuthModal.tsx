@@ -61,11 +61,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   const handleContinueAsLocalDev = () => {
+    let devCredits = 150;
+    try {
+      if (localStorage.getItem('pointc_welcome_claimed')) {
+        devCredits = 0;
+      } else {
+        localStorage.setItem('pointc_welcome_claimed', 'true');
+      }
+    } catch {}
+
     const localProfile: UserProfile = {
       uid: 'dev_local_' + Math.random().toString(36).substring(2, 9),
       displayName: name.trim() || 'Desarrollador pointC (Local)',
       email: email.trim() || 'desarrollador@pointc.dev',
-      credits: 150,
+      credits: devCredits,
       plan: 'Gratuito',
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -287,6 +296,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         {/* Email & Password Form */}
+        {isRegister && (
+          <div className="p-2.5 rounded-xl bg-cyan-950/60 border border-cyan-500/30 text-cyan-200 text-xs flex items-start gap-2">
+            <ShieldCheck className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <span className="font-bold text-white block">Regalo de Bienvenida: +150 Créditos</span>
+              <span className="text-[11px] text-cyan-300/80 block">
+                Verificación anti-abuso: Solo cuentas y correos no registrados previamente recibirán los 150 créditos de regalo.
+              </span>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleEmailAuth} className="space-y-3">
           {isRegister && (
             <div className="space-y-1">
