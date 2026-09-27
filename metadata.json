@@ -1,0 +1,6 @@
+{
+  "name": "pointC IDE - Natural Language C & C++ Studio",
+  "description": "IDE web que traduce lenguaje natural estructurado (sintaxis pointC con procesos por punto y frases por coma con keywords en MAYÚSCULAS) a código C y C++ optimizado con sugerencias de rendimiento y simulación.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

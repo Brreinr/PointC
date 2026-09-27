@@ -1,0 +1,71 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with display name, email, plan and purchased credit balance",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "credits": { "type": "number" },
+        "totalTokensSpent": { "type": "number" },
+        "plan": { "type": "string", "enum": ["Gratuito", "Pro", "Enterprise"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "credits"]
+    },
+    "ProjectFile": {
+      "title": "ProjectFile",
+      "description": "pointC source code files and their translated C and C++ counterparts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "content": { "type": "string" },
+        "cCode": { "type": "string" },
+        "cppCode": { "type": "string" },
+        "isDeleted": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["active", "deleted"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "deletedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "name", "content"]
+    },
+    "CreditTransaction": {
+      "title": "CreditTransaction",
+      "description": "Log of purchased credits or billing events",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "planName": { "type": "string" },
+        "creditsAdded": { "type": "number" },
+        "amountUsd": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "transactionRef": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "creditsAdded", "amountUsd"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User account document containing profile, name and credit balance"
+    },
+    "/users/{userId}/projects/{projectId}": {
+      "schema": "ProjectFile",
+      "description": "User code files, active or deleted, with pointC, C and C++ content"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "CreditTransaction",
+      "description": "Purchased credit transaction logs"
+    }
+  }
+}
